@@ -55,7 +55,7 @@ def transform_salesforce_record(record: dict):
     return {
         "Age": record["Age__c"],
         "CreditScore": record["Cibil_Score__c"],
-        "LoanTerm": record["Tenure_required_months__c"],
+        "LoanTerm": record["Tenure_required_months__c"]/12,
         "InterestRate": record["ROI__c"] / 100,   # Remove /100 if trained on raw percent
         "Emp_Risk": encode_emp_risk(record["Employment_Type__c"]),
         "FOIR": record["FOIR__c"] / 100           # Remove /100 if trained on raw percent
