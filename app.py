@@ -23,6 +23,15 @@ if model.coef_.shape[1] != EXPECTED_FEATURES:
     raise Exception("Model feature mismatch! Check training feature order.")
 
 
+FEATURE_ORDER = [
+    "Age",
+    "CreditScore",
+    "LoanTerm",
+    "InterestRate",
+    "Emp_Risk",
+    "FOIR"
+]
+
 # ==============================
 # EMPLOYMENT RISK ENCODING
 # ==============================
@@ -36,7 +45,7 @@ def encode_emp_risk(emp_type: str) -> int:
     mapping = {
         "Salaried": 0,
         "Self Employed": 1,
-        "Unemployed": 1
+        "Unemployed": 2
     }
 
     return mapping.get(emp_type, 1)
@@ -56,9 +65,9 @@ def transform_salesforce_record(record: dict):
         "Age": record["Age__c"],
         "CreditScore": record["Cibil_Score__c"],
         "LoanTerm": record["Tenure_required_months__c"]/12,
-        "InterestRate": record["ROI__c"] / 100,   # Remove /100 if trained on raw percent
+        "InterestRate": record["ROI__c"]*100,   
         "Emp_Risk": encode_emp_risk(record["Employment_Type__c"]),
-        "FOIR": record["FOIR__c"] / 100           # Remove /100 if trained on raw percent
+        "FOIR": record["FOIR__c"]          
     }
 
 
