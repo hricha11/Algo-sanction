@@ -27,7 +27,7 @@ class PDInput(BaseModel):
 def health():
     return {"status": "running"}
 
-@app.post("/v2/predict")
+@app.post("/predict")
 def predict(data: PDInput):
     try:
         # Feature order MUST match training
