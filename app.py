@@ -67,7 +67,7 @@ def transform_salesforce_record(record: dict):
         "LoanTerm": record["Tenure_required_months__c"]/12,
         "InterestRate": record["ROI__c"],   
         "Emp_Risk": encode_emp_risk(record["Employment_Type__c"]),
-        "FOIR": record["FOIR__c"]          
+        "FOIR": record["FOIR__c"]/100          
     }
 
 
