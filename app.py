@@ -20,7 +20,7 @@ print("====================")
 EXPECTED_FEATURES = 5
 
 if model.coef_.shape[1] != EXPECTED_FEATURES:
-    raise Exception("Model feature mismatch! Retrain model without LoanTerm.")
+    raise Exception("Model feature mismatch!")
 
 FEATURE_ORDER = [
     "Age",
@@ -30,9 +30,6 @@ FEATURE_ORDER = [
     "FOIR"
 ]
 
-# ==============================
-# EMPLOYMENT RISK ENCODING
-# ==============================
 
 def encode_emp_risk(emp_type: str) -> int:
     """
@@ -134,16 +131,48 @@ def predict(data: PDInput):
 @app.post("/predict-salesforce")
 def predict_salesforce(record: dict):
     try:
+        # ---- Check required fields exist ----
+        required_fields = [
+            "Age__c",
+            "Cibil_Score__c",
+            "ROI__c",
+            "Employment_Type__c",
+            "FOIR__c"
+        ]
+
+        for field in required_fields:
+            if field not in record or record[field] in [None, ""]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Missing required field: {field}"
+                )
+
+        # ---- Transform ----
         transformed = transform_salesforce_record(record)
 
-        X = np.array([[
-            transformed["Age"],
-            transformed["CreditScore"],
-            transformed["InterestRate"],
-            transformed["Emp_Risk"],
-            transformed["FOIR"]
-        ]])
+        # ---- Convert safely to float ----
+        try:
+            X = np.array([[ 
+                float(transformed["Age"]),
+                float(transformed["CreditScore"]),
+                float(transformed["InterestRate"]),
+                float(transformed["Emp_Risk"]),
+                float(transformed["FOIR"])
+            ]])
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid numeric format in input fields."
+            )
 
+        # ---- Check for NaN explicitly ----
+        if np.isnan(X).any():
+            raise HTTPException(
+                status_code=400,
+                detail="Input contains invalid or missing numeric values."
+            )
+
+        # ---- Predict ----
         pd_value = model.predict_proba(X)[0][1]
 
         return {
@@ -152,5 +181,12 @@ def predict_salesforce(record: dict):
             "risk_band": risk_band(pd_value)
         }
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException as e:
+        raise e
+
+    except Exception:
+        # Never expose sklearn stacktrace
+        raise HTTPException(
+            status_code=500,
+            detail="Internal risk engine error."
+        )
