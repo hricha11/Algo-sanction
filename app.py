@@ -5,9 +5,6 @@ import numpy as np
 
 app = FastAPI(title="PD Logistic Model API vFinal")
 
-# ==============================
-# LOAD MODEL
-# ==============================
 
 model = joblib.load("pd_model.pkl")
 
@@ -46,9 +43,6 @@ def encode_emp_risk(emp_type: str) -> int:
 
     return mapping.get(emp_type, 1)
 
-# ==============================
-# SALESFORCE TRANSFORMATION
-# ==============================
 
 def transform_salesforce_record(record: dict):
     """
@@ -64,9 +58,6 @@ def transform_salesforce_record(record: dict):
         "FOIR": record["FOIR__c"]
     }
 
-# ==============================
-# INPUT SCHEMA (MANUAL NUMERIC INPUT)
-# ==============================
 
 class PDInput(BaseModel):
     Age: int = Field(..., ge=18, le=80)
@@ -76,17 +67,11 @@ class PDInput(BaseModel):
     FOIR: float = Field(..., ge=0, le=100)
 
 
-# ==============================
-# HEALTH CHECK
-# ==============================
-
 @app.get("/")
 def health():
     return {"status": "running"}
 
-# ==============================
-# RISK BANDING
-# ==============================
+
 
 def risk_band(pd: float):
     if pd < 0.05:
@@ -97,10 +82,6 @@ def risk_band(pd: float):
         return "HIGH"
     else:
         return "VERY_HIGH"
-
-# ==============================
-# PREDICT (NUMERIC DIRECT INPUT)
-# ==============================
 
 @app.post("/predict")
 def predict(data: PDInput):
@@ -124,14 +105,11 @@ def predict(data: PDInput):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ==============================
-# PREDICT (RAW SALESFORCE RECORD)
-# ==============================
 
 @app.post("/predict-salesforce")
 def predict_salesforce(record: dict):
     try:
-        # ---- Check required fields exist ----
+        # Check required fields exist 
         required_fields = [
             "Age__c",
             "Cibil_Score__c",
@@ -140,17 +118,26 @@ def predict_salesforce(record: dict):
             "FOIR__c"
         ]
 
+        field_labels = {
+            "Age__c": "Age",
+            "Cibil_Score__c": "Credit Score",
+            "ROI__c": "Interest Rate",
+            "Employment_Type__c": "Employment Type",
+            "FOIR__c": "FOIR"
+        }
+
         for field in required_fields:
             if field not in record or record[field] in [None, ""]:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Missing required field: {field}"
+                    detail=f"{field_labels[field]} is required."
                 )
 
-        # ---- Transform ----
+
+        # Transform 
         transformed = transform_salesforce_record(record)
 
-        # ---- Convert safely to float ----
+        # Convert safely to float
         try:
             X = np.array([[ 
                 float(transformed["Age"]),
@@ -165,14 +152,14 @@ def predict_salesforce(record: dict):
                 detail="Invalid numeric format in input fields."
             )
 
-        # ---- Check for NaN explicitly ----
+        # Check for NaN explicitly 
         if np.isnan(X).any():
             raise HTTPException(
                 status_code=400,
                 detail="Input contains invalid or missing numeric values."
             )
 
-        # ---- Predict ----
+        # Predict
         pd_value = model.predict_proba(X)[0][1]
 
         return {
@@ -185,7 +172,6 @@ def predict_salesforce(record: dict):
         raise e
 
     except Exception:
-        # Never expose sklearn stacktrace
         raise HTTPException(
             status_code=500,
             detail="Internal risk engine error."
